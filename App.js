@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,54 @@ import {
   FlatList,
   StyleSheet,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
   const [tarefa, setTarefa] = useState('');
   const [listaTarefas, setListaTarefas] = useState([]);
 
+  // Carregar tarefas salvas ao iniciar o app
+  useEffect(() => {
+    const carregarTarefas = async () => {
+      try {
+        const tarefasSalvas = await AsyncStorage.getItem('tarefas');
+        if (tarefasSalvas) {
+          setListaTarefas(JSON.parse(tarefasSalvas));
+        }
+      } catch (error) {
+        console.log('Erro ao carregar tarefas:', error);
+      }
+    };
+    carregarTarefas();
+  }, []);
+
+  // Salvar tarefas sempre que a lista mudar
+  useEffect(() => {
+    const salvarTarefas = async () => {
+      try {
+        await AsyncStorage.setItem('tarefas', JSON.stringify(listaTarefas));
+      } catch (error) {
+        console.log('Erro ao salvar tarefas:', error);
+      }
+    };
+    salvarTarefas();
+  }, [listaTarefas]);
+
   const adicionarTarefa = () => {
-    if (tarefa.trim() === '') return; // Evita adicionar tarefas vazias
-    setListaTarefas([...listaTarefas, { id: Date.now().toString(), texto: tarefa }]);
-    setTarefa(''); // Limpa o campo após adicionar
+    if (tarefa.trim() === '') return;
+    setListaTarefas([
+      ...listaTarefas,
+      { id: Date.now().toString(), texto: tarefa, concluida: false },
+    ]);
+    setTarefa('');
+  };
+
+  const toggleConcluida = (id) => {
+    setListaTarefas(
+      listaTarefas.map((item) =>
+        item.id === id ? { ...item, concluida: !item.concluida } : item
+      )
+    );
   };
 
   const removerTarefa = (id) => {
@@ -43,7 +82,22 @@ export default function App() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.itemTarefa}>
-            <Text style={styles.textoTarefa}>{item.texto}</Text>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => toggleConcluida(item.id)}
+            >
+              <Text style={styles.checkboxTexto}>
+                {item.concluida ? '✓' : ' '}
+              </Text>
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.textoTarefa,
+                item.concluida && styles.textoConcluido,
+              ]}
+            >
+              {item.texto}
+            </Text>
             <TouchableOpacity
               style={styles.botaoRemover}
               onPress={() => removerTarefa(item.id)}
@@ -98,7 +152,6 @@ const styles = StyleSheet.create({
   },
   itemTarefa: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#fff',
     padding: 15,
@@ -107,9 +160,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#2196F3',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  checkboxTexto: {
+    fontSize: 16,
+    color: '#2196F3',
+  },
   textoTarefa: {
+    flex: 1,
     fontSize: 16,
     color: '#333',
+  },
+  textoConcluido: {
+    textDecorationLine: 'line-through',
+    color: '#888',
   },
   botaoRemover: {
     backgroundColor: '#f44336',
